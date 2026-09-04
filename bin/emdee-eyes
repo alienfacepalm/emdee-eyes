@@ -1,0 +1,140 @@
+#!/bin/sh
+# emdee-eyes — render markdown in the terminal with glow.
+# (named emdee-eyes, not md, because oh-my-zsh's core aliases already bind
+# `md` to `mkdir -p`)
+#
+#   emdee-eyes                  browse markdown files in the current directory
+#   emdee-eyes <dir>            browse markdown files in that directory
+#   emdee-eyes <file.md> ...    render one or more files (paged if stdout is a TTY)
+#   emdee-eyes <url>            fetch and render remote markdown
+#   cat x.md | emdee-eyes       render stdin
+#
+# At an interactive terminal, key hints (quit/search/page) are shown in a
+# banner above each file and, with the default pager, in a persistent
+# status line at the bottom too. Piped/redirected output skips both.
+#
+# Env:
+#   MD_STYLE   glow style: auto (default), dark, light, notty, or a theme JSON path
+#   PAGER      pager to use for terminal output (default: less -R)
+
+set -eu
+
+usage() {
+    cat <<'EOF'
+usage: emdee-eyes [file.md|dir|url] ...
+       cat file.md | emdee-eyes
+
+Renders markdown with glow. With no arguments, browses markdown files
+in the current directory. Multiple files are rendered together in one
+pager. At a real terminal, key hints (quit/search/page) show above the
+content and, with the default pager, in a status line at the bottom.
+See `glow --help` for the underlying renderer's own options.
+
+Env:
+  MD_STYLE   glow style: auto (default), dark, light, notty, or a theme JSON path
+  PAGER      pager for terminal output (default: less -R)
+EOF
+}
+
+case "${1:-}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+esac
+
+if ! command -v glow >/dev/null 2>&1; then
+    echo "emdee-eyes: glow not found — install it with: brew install glow" >&2
+    exit 127
+fi
+
+style="${MD_STYLE:-auto}"
+
+width=80
+if cols=$(tput cols 2>/dev/null) && [ -n "$cols" ]; then
+    width=$((cols - 4))
+    [ "$width" -gt 100 ] && width=100
+    [ "$width" -lt 20 ] && width=20
+fi
+
+# No args and stdin is a TTY: browse the current directory.
+if [ "$#" -eq 0 ] && [ -t 0 ]; then
+    exec glow -s "$style" -w "$width" .
+fi
+
+# Single directory argument: browse that directory.
+if [ "$#" -eq 1 ] && [ -d "$1" ]; then
+    exec glow -s "$style" -w "$width" "$1"
+fi
+
+esc=$(printf '\033')
+
+# glow's default styles literally prefix rendered level-2..6 headings with
+# their own markdown syntax ("## " through "###### ", still colored/bold,
+# but showing the raw symbols) while level-1 headings just get a plain
+# space. Each prefix is always its own self-contained escape+text+reset
+# run, so stripping it can't misfire on real "#" characters in prose or
+# code — those are always merged into a longer colored run, never isolated
+# like this.
+strip_heading_prefix() {
+    sed -E "s/${esc}\[[0-9;]*m#{2,6} ${esc}\[m//g"
+}
+
+# Action hints shown only at an interactive terminal: a top banner above
+# each file's content, and (for the default pager) a persistent bottom
+# status line. Piped/redirected output stays plain, since a script or
+# `grep` on the other end has no use for either.
+hints='q quit  / search  n/N next  space/b page  g/G top/bottom'
+show_hints=0
+[ -t 1 ] && show_hints=1
+
+# glow itself only accepts a single file/url/stdin argument, so anything
+# with more than one file is rendered here as a loop, one glow call per file.
+render_all() {
+    if [ "$#" -eq 0 ]; then
+        # No file arguments: read from stdin.
+        glow -s "$style" -w "$width"
+        return
+    fi
+    for f in "$@"; do
+        if [ "$#" -gt 1 ]; then
+            header="── $f ──"
+            [ "$show_hints" -eq 1 ] && header="$header  $hints"
+            printf '\n\033[1;36m%s\033[0m\n\n' "$header"
+        elif [ "$show_hints" -eq 1 ]; then
+            printf '\n\033[1;36m── %s ──  %s\033[0m\n\n' "$f" "$hints"
+        fi
+        glow -s "$style" -w "$width" "$f"
+    done
+}
+
+# render_all runs on the left of a pipe (to filter its output), which would
+# normally hide its exit status behind the filter's — so its real status is
+# captured to a temp file and restored below, after the pipeline finishes.
+status_file=$(mktemp)
+trap 'rm -f "$status_file"' EXIT
+
+render_with_status() {
+    if render_all "$@"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    echo "$rc" > "$status_file"
+}
+
+if [ "$show_hints" -eq 1 ]; then
+    if [ -z "${PAGER:-}" ]; then
+        # less's own persistent bottom status line, in place of its default
+        # (which just shows the filename) -- unlike the top banner, it
+        # stays put no matter how far you've scrolled.
+        render_with_status "$@" | strip_heading_prefix | less -R -Ps"$hints "
+    else
+        # A user-supplied PAGER might not understand -P, so it's left alone.
+        render_with_status "$@" | strip_heading_prefix | ${PAGER}
+    fi
+else
+    render_with_status "$@" | strip_heading_prefix
+fi
+
+exit "$(cat "$status_file")"
