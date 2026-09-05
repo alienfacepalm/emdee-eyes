@@ -20,6 +20,9 @@ MIT-licensed). `emdee-eyes` adds:
 - one command that does the right thing whether you give it a file, a
   directory, several files, a URL, or piped stdin
 - a clear error if `glow` itself isn't installed
+- the same behavior on macOS, Linux, and Windows — `bin/emdee-eyes` (sh)
+  and `bin/emdee-eyes.ps1` (PowerShell) are kept in sync; see
+  [setup.md](setup.md#requirements) for which one to install
 
 ## Why it isn't called `md`
 

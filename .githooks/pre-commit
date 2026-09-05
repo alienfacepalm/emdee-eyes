@@ -1,0 +1,5 @@
+#!/bin/sh
+# Blocks the commit unless tests/verify.sh passes. Installed by
+# install.sh/install.ps1 via `git config core.hooksPath .githooks`.
+DIR=$(cd "$(dirname "$0")/.." && pwd)
+"$DIR/tests/verify.sh"

@@ -1,14 +1,24 @@
 # Setup
 
-`emdee-eyes` is a small shell wrapper around [glow](https://github.com/charmbracelet/glow),
-Charm's terminal markdown renderer. This page covers installing it on a new
-machine and confirming it works.
+`emdee-eyes` is a small wrapper around [glow](https://github.com/charmbracelet/glow),
+Charm's terminal markdown renderer. There are two implementations — a POSIX
+`sh` script and a PowerShell script — kept behaviorally identical; use
+whichever matches your platform. This page covers installing either one on
+a new machine and confirming it works.
 
 ## Requirements
 
-- macOS or Linux with a POSIX `sh` (already present)
-- [Homebrew](https://brew.sh) — used to install `glow` and, for running the
-  test suite, `bats-core`
+- **macOS or Linux** (also Windows under Git Bash or WSL): a POSIX `sh`
+  (already present) and [Homebrew](https://brew.sh) — or, on Linux, your
+  distro's own package manager (apt/dnf/yum/pacman/apk), which `install.sh`
+  tries first — used to install `glow` and, for running the test suite,
+  `bats-core`.
+- **Windows**: PowerShell (5.1, already present, or [PowerShell
+  7+](https://github.com/PowerShell/PowerShell)) and one of
+  [winget](https://learn.microsoft.com/windows/package-manager/winget/)
+  (already present on modern Windows), [scoop](https://scoop.sh), or
+  [Chocolatey](https://chocolatey.org) — used to install `glow` and, for
+  running the test suite, the [Pester](https://pester.dev) module.
 - A `~/.local/bin` directory on your `PATH` (most shells already have this;
   see [Troubleshooting](#troubleshooting) if not)
 
@@ -20,16 +30,26 @@ From the project directory:
 ./install.sh
 ```
 
-This does three things:
+```powershell
+./install.ps1
+```
 
-1. Installs `glow` via Homebrew, if it isn't already on your `PATH`.
-2. Symlinks `bin/emdee-eyes` into `~/.local/bin/emdee-eyes`.
+Each does the same four things for its platform:
+
+1. Installs `glow`, if it isn't already on your `PATH` (via Homebrew or
+   your distro's package manager on macOS/Linux; via winget, scoop, or
+   choco on Windows).
+2. Links the command into `~/.local/bin` — a real symlink to
+   `bin/emdee-eyes` on macOS/Linux, or a `~/.local/bin/emdee-eyes.cmd` shim
+   pointing at `bin/emdee-eyes.ps1` on Windows.
 3. Warns if `~/.local/bin` isn't on your `PATH`.
+4. Sets `git config core.hooksPath .githooks`, so `git commit`/`git push`
+   run the test suite first (see [Running the test suite](#running-the-test-suite)).
 
-Because `~/.local/bin/emdee-eyes` is a symlink back to `bin/emdee-eyes` in this
-project, there is exactly one copy of the script — pulling updates to this
-project (`git pull`, or however you sync it) updates the live command too,
-with nothing to reinstall.
+Because the installed command is a symlink/shim back into this project,
+there is exactly one copy of each script — pulling updates to this project
+(`git pull`, or however you sync it) updates the live command too, with
+nothing to reinstall.
 
 ## Verify
 
@@ -49,12 +69,20 @@ status line pinned to the bottom of the screen, are there if you forget.
 
 ## Manual install
 
-If you'd rather not run `install.sh` — for example, scripting this into a
-dotfiles setup — the two commands it runs are:
+If you'd rather not run `install.sh`/`install.ps1` — for example, scripting
+this into a dotfiles setup — the commands they run are, on macOS/Linux:
 
 ```sh
 brew install glow
 ln -s "$(pwd)/bin/emdee-eyes" ~/.local/bin/emdee-eyes
+```
+
+and on Windows:
+
+```powershell
+winget install charmbracelet.glow
+# then create ~/.local/bin/emdee-eyes.cmd containing:
+#   pwsh -NoProfile -File "<project path>\bin\emdee-eyes.ps1" %*
 ```
 
 ## Troubleshooting
@@ -74,9 +102,10 @@ that doesn't source your rc file). Run `brew install glow` and confirm
 with `which glow`.
 
 **`install.sh: ~/.local/bin/emdee-eyes already exists and isn't this project's link`**
+(or the equivalent `install.ps1` message about `emdee-eyes.cmd`)
 Something else is already at that path — a different script, or a stale
-symlink from before this project existed. Move or remove it, then
-re-run `install.sh`.
+symlink/shim from before this project existed. Move or remove it, then
+re-run the installer.
 
 **Nothing named `md`**
 `emdee-eyes` is deliberately not called `md`, because oh-my-zsh's core
@@ -87,15 +116,27 @@ own alias — see [onboarding.md](onboarding.md#renaming-it-to-md) for how.
 
 ## Running the test suite
 
-The test suite is only needed if you're changing `bin/emdee-eyes` itself, not
-for everyday use.
+The test suite is only needed if you're changing `bin/emdee-eyes` or
+`bin/emdee-eyes.ps1` themselves, not for everyday use. Run whichever suite
+matches the tooling you have (both, if you have both):
 
 ```sh
-brew install bats-core
+brew install bats-core                # macOS/Linux/Git Bash/WSL
 ./tests/run.sh
 ```
 
-This runs `tests/unit` (argument-routing logic, stubbed glow — no
-dependency on rendering) followed by `tests/e2e` (the real glow, against
-the files in `examples/`). See [usage.md](usage.md) for what each example
-file demonstrates.
+```powershell
+Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force   # Windows
+./tests/run.ps1
+```
+
+Or run `./tests/verify.sh`, which runs both if both are available and
+otherwise whichever one is — this is exactly what `.githooks/pre-commit`
+and `.githooks/pre-push` run automatically once you've run an installer.
+
+Each suite runs, in order: `tests/unit` (argument-routing logic, stubbed
+glow — no dependency on rendering), `tests/regression` (the same stub,
+covering specific edge cases like filenames with spaces and width-clamp
+boundaries), and `tests/e2e` (the real glow, against the files in
+`examples/`). See [usage.md](usage.md) for what each example file
+demonstrates.

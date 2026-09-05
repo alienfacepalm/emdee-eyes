@@ -49,6 +49,12 @@ option, so `emdee-eyes` doesn't try to pass it one.
 | `MD_STYLE`  | `auto`   | glow style: `auto` (follows terminal background), `dark`, `light`, `notty` (no color codes), or a path to a custom theme JSON |
 | `PAGER`     | `less -R`| Pager used for terminal output (one file or several). The `-R` is required — without it, ANSI color codes show up as literal escape text |
 
+On Windows (`bin/emdee-eyes.ps1`), the default pager is also `less -R` if
+`less` is on `PATH` (e.g. via `scoop install less` or Git for Windows'
+bundled tools), falling back to `more` if not, and finally to unpaged
+output if neither is available — the key-hint banner still shows either
+way. `PAGER` overrides all of that, same as on macOS/Linux.
+
 ### Exit codes
 
 - `0` — success

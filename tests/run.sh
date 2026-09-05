@@ -1,6 +1,11 @@
 #!/bin/sh
-# Runs the full emdee-eyes test suite: unit tests (stubbed glow), then
-# e2e tests (real glow, real example files).
+# Runs the sh-implementation (bin/emdee-eyes) test suite: unit tests
+# (stubbed glow), regression tests (stubbed glow, specific past-bug and
+# edge-case coverage), then e2e tests (real glow, real example files).
+#
+# This only covers the POSIX sh implementation. See tests/run.ps1 for the
+# PowerShell implementation's equivalent suite (bin/emdee-eyes.ps1), and
+# tests/verify.sh to run whichever of the two this machine can.
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 
@@ -11,6 +16,10 @@ fi
 
 echo "== unit tests =="
 bats "$DIR/unit"
+
+echo
+echo "== regression tests =="
+bats "$DIR/regression"
 
 echo
 echo "== e2e tests =="
