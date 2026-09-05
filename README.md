@@ -1,5 +1,7 @@
 # emdee-eyes
 
+[![Tests](https://github.com/alienfacepalm/emdee-eyes/actions/workflows/tests.yml/badge.svg)](https://github.com/alienfacepalm/emdee-eyes/actions/workflows/tests.yml)
+
 A markdown viewer for the terminal. `emdee-eyes` is a small wrapper around
 [glow](https://github.com/charmbracelet/glow) that adds sane terminal-width
 wrapping and one command that does the right thing for a file, a directory,
@@ -93,6 +95,11 @@ implementations are held to the same behavior.
 `.githooks/pre-commit` and `.githooks/pre-push` both run `tests/verify.sh`,
 so once you've run either installer, every commit and push is verified
 automatically.
+
+GitHub Actions runs the POSIX suite on Ubuntu and the PowerShell suite on
+Windows for branch pushes, pull requests, manual dispatches, and `v*` release
+tags. Unlike local verification, CI always runs both implementations and
+installs real copies of Glow and `emdee-eyes` for the end-to-end coverage.
 
 ## Releasing
 

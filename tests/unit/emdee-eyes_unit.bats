@@ -68,7 +68,9 @@ FAKE
 
 @test "missing glow fails fast with a clear, actionable error" {
     rm -f "$FAKE_BIN/glow"
-    run -127 "$EMDEE_EYES" README.md
+    # Keep the real machine PATH out of this assertion. CI installs Glow for
+    # the e2e suite, and finding that copy here would invalidate this test.
+    PATH="$FAKE_BIN" run -127 "$EMDEE_EYES" README.md
     [ "$status" -eq 127 ]
     [[ "$output" == *"glow not found"* ]]
     [[ "$output" == *"brew install glow"* ]]
