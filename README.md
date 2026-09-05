@@ -75,10 +75,29 @@ doc/              setup, onboarding, and usage documentation
 
 ## Testing
 
+For the POSIX suite, install Bats with the package manager for your platform:
+
 ```sh
-brew install bats-core                                    # for tests/run.sh
-Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force   # for tests/run.ps1
-./tests/verify.sh     # runs whichever of the two this machine has tooling for
+# macOS
+brew install bats-core
+
+# Ubuntu/Debian
+sudo apt-get update && sudo apt-get install -y bats
+
+./tests/run.sh
+```
+
+For the PowerShell suite, install Pester:
+
+```powershell
+Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force
+./tests/run.ps1
+```
+
+Or run every suite available on the current machine:
+
+```sh
+./tests/verify.sh
 ```
 
 Unit tests stub out `glow` to check `emdee-eyes`'s own argument routing

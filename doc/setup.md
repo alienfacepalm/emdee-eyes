@@ -123,9 +123,17 @@ The test suite is only needed if you're changing `bin/emdee-eyes` or
 matches the tooling you have (both, if you have both):
 
 ```sh
-brew install bats-core                # macOS/Linux/Git Bash/WSL
+# macOS
+brew install bats-core
+
+# Ubuntu/Debian
+sudo apt-get update && sudo apt-get install -y bats
+
 ./tests/run.sh
 ```
+
+On other Linux distributions, install the `bats` package using the system
+package manager before running `./tests/run.sh`.
 
 ```powershell
 Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force   # Windows
