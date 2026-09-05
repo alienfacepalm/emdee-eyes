@@ -34,26 +34,19 @@ setup() {
 FAKE
     chmod +x "$FAKE_BIN/glow"
 
+    cat > "$FAKE_BIN/tput" <<'FAKE'
+#!/bin/sh
+[ "${1:-}" = cols ] || exit 1
+printf '80\n'
+FAKE
+    chmod +x "$FAKE_BIN/tput"
+
     PATH="$FAKE_BIN:/usr/bin:/bin"
     export PATH
 
-    DEFAULT_WIDTH=80
-    default_cols=${COLUMNS:-}
-    if [ -z "$default_cols" ]; then
-        default_cols=$(tput cols 2>/dev/null) || default_cols=""
-    fi
-    case "$default_cols" in
-        ''|*[!0-9]*) ;;
-        *)
-            DEFAULT_WIDTH=$((default_cols - 4))
-            if [ "$DEFAULT_WIDTH" -gt 100 ]; then
-                DEFAULT_WIDTH=100
-            fi
-            if [ "$DEFAULT_WIDTH" -lt 20 ]; then
-                DEFAULT_WIDTH=20
-            fi
-            ;;
-    esac
+    COLUMNS=
+    export COLUMNS
+    DEFAULT_WIDTH=76
 }
 
 @test "a filename containing spaces is passed through as one argument, not split" {
