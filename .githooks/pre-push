@@ -5,9 +5,6 @@ set -eu
 
 DIR=$(cd "$(dirname "$0")/.." && pwd)
 REMOTE_NAME=${1:-origin}
-UPDATES=$(mktemp)
-trap 'rm -f "$UPDATES"' EXIT HUP INT TERM
-cat > "$UPDATES"
 
 is_zero_oid() {
     case "$1" in
@@ -31,6 +28,6 @@ while read -r local_ref local_oid remote_ref remote_oid; do
                 "$remote_ref" "$local_oid" "$remote_oid" "$REMOTE_NAME"
             ;;
     esac
-done < "$UPDATES"
+done
 
 "$DIR/tests/verify.sh"
