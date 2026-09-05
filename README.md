@@ -116,8 +116,8 @@ so once you've run either installer, every commit and push is verified
 automatically.
 
 GitHub Actions runs the POSIX suite on Ubuntu and the PowerShell suite on
-Windows for branch pushes, pull requests, manual dispatches, and `v*` release
-tags. Unlike local verification, CI always runs both implementations and
+Windows for pull requests, manual dispatches, and `v*` release tags. Unlike
+local verification, CI always runs both implementations and
 installs real copies of Glow and `emdee-eyes` for the end-to-end coverage.
 
 ## Releasing

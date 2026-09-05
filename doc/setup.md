@@ -152,7 +152,8 @@ boundaries), and `tests/e2e` (the real glow, against the files in
 `examples/`). See [usage.md](usage.md) for what each example file
 demonstrates.
 
-The repository's GitHub Actions workflow runs both suites on every branch
-push and pull request, and again for `v*` release tags. The Linux job installs
-the POSIX command and the Windows job installs the PowerShell command, so the
-installed-command end-to-end checks run in CI instead of being skipped.
+The repository's GitHub Actions workflow runs both suites for every pull
+request and `v*` release tag, and it can also be started manually. The Linux
+job installs the POSIX command and the Windows job installs the PowerShell
+command, so the installed-command end-to-end checks run in CI instead of
+being skipped.
