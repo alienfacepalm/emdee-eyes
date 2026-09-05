@@ -42,14 +42,23 @@ FAKE
     # The default width emdee-eyes computes when no COLUMNS override is set,
     # derived the same way the script does, so tests aren't hardcoded to
     # one machine's `tput cols` fallback.
-    default_cols=$(tput cols 2>/dev/null || echo 80)
-    DEFAULT_WIDTH=$((default_cols - 4))
-    if [ "$DEFAULT_WIDTH" -gt 100 ]; then
-        DEFAULT_WIDTH=100
+    DEFAULT_WIDTH=80
+    default_cols=${COLUMNS:-}
+    if [ -z "$default_cols" ]; then
+        default_cols=$(tput cols 2>/dev/null) || default_cols=""
     fi
-    if [ "$DEFAULT_WIDTH" -lt 20 ]; then
-        DEFAULT_WIDTH=20
-    fi
+    case "$default_cols" in
+        ''|*[!0-9]*) ;;
+        *)
+            DEFAULT_WIDTH=$((default_cols - 4))
+            if [ "$DEFAULT_WIDTH" -gt 100 ]; then
+                DEFAULT_WIDTH=100
+            fi
+            if [ "$DEFAULT_WIDTH" -lt 20 ]; then
+                DEFAULT_WIDTH=20
+            fi
+            ;;
+    esac
 }
 
 @test "--help prints usage and exits 0, even with no glow installed" {
