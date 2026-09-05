@@ -45,10 +45,12 @@ if ($Files.Count -ge 1 -and ($Files[0] -eq '-h' -or $Files[0] -eq '--help')) {
     exit 0
 }
 
-if (-not (Get-Command glow -ErrorAction SilentlyContinue)) {
+$glowCommand = Get-Command glow -CommandType Application -ErrorAction SilentlyContinue
+if (-not $glowCommand) {
     [Console]::Error.WriteLine('emdee-eyes: glow not found — install it with: winget install charmbracelet.glow')
     exit 127
 }
+$glowPath = $glowCommand.Source
 
 $style = if ($env:MD_STYLE) { $env:MD_STYLE } else { 'auto' }
 
@@ -67,10 +69,34 @@ if ($cols) {
 
 $stdinIsConsole = -not [Console]::IsInputRedirected
 $stdoutIsConsole = -not [Console]::IsOutputRedirected
+$script:renderRc = 0
+
+# Glow prioritizes redirected stdin over an explicit source argument. When
+# this wrapper inherited redirected input but was given a file/URL, launch
+# Glow with the platform's null device so the explicit source still wins.
+function Invoke-GlowSource {
+    param([Parameter(Mandatory)][string]$Source)
+
+    if ($IsWindows) {
+        $shim = Join-Path ([IO.Path]::GetTempPath()) ("emdee-eyes-$([Guid]::NewGuid()).cmd")
+        try {
+            $body = "@echo off`r`n`"%~1`" -s `"%~2`" -w `"%~3`" `"%~4`" <NUL`r`nexit /b %ERRORLEVEL%`r`n"
+            [IO.File]::WriteAllText($shim, $body, [Text.Encoding]::ASCII)
+            & $shim $glowPath $style ([string]$width) $Source
+            $script:renderRc = $LASTEXITCODE
+        } finally {
+            Remove-Item -LiteralPath $shim -Force -ErrorAction SilentlyContinue
+        }
+    } else {
+        & sh -c 'exec "$1" -s "$2" -w "$3" "$4" </dev/null' sh `
+            $glowPath $style ([string]$width) $Source
+        $script:renderRc = $LASTEXITCODE
+    }
+}
 
 # No args and stdin is a console: browse the current directory.
 if ($Files.Count -eq 0 -and $stdinIsConsole) {
-    & glow -s $style -w $width .
+    & $glowPath -s $style -w $width .
     exit $LASTEXITCODE
 }
 
@@ -82,8 +108,12 @@ if ($Files.Count -eq 1) {
     try { $isDir = Test-Path -LiteralPath $Files[0] -PathType Container } catch { $isDir = $false }
 }
 if ($Files.Count -eq 1 -and $isDir) {
-    & glow -s $style -w $width $Files[0]
-    exit $LASTEXITCODE
+    if ($stdinIsConsole) {
+        & $glowPath -s $style -w $width $Files[0]
+        exit $LASTEXITCODE
+    }
+    Invoke-GlowSource -Source $Files[0]
+    exit $script:renderRc
 }
 
 $esc = [char]27
@@ -105,14 +135,12 @@ filter Remove-HeadingPrefix {
 $hints = 'q quit  / search  n/N next  space/b page  g/G top/bottom'
 $showHints = $stdoutIsConsole
 
-$script:renderRc = 0
-
 # glow itself only accepts a single file/url/stdin argument, so anything
 # with more than one file is rendered here as a loop, one glow call per file.
 function Get-RenderedOutput {
     if ($Files.Count -eq 0) {
         # No file arguments: read from stdin.
-        & glow -s $style -w $width
+        & $glowPath -s $style -w $width -
         $script:renderRc = $LASTEXITCODE
         return
     }
@@ -124,8 +152,12 @@ function Get-RenderedOutput {
         } elseif ($showHints) {
             "`n$esc[1;36m── $f ──  $hints$esc[0m`n"
         }
-        & glow -s $style -w $width $f
-        $script:renderRc = $LASTEXITCODE
+        if ($stdinIsConsole) {
+            & $glowPath -s $style -w $width $f
+            $script:renderRc = $LASTEXITCODE
+        } else {
+            Invoke-GlowSource -Source $f
+        }
     }
 }
 

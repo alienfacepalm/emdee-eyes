@@ -1,0 +1,91 @@
+#!/bin/sh
+# Validate one release tag before pre-push allows it onto a remote.
+# Usage: check-release-tag <refs/tags/vX.Y.Z> <local-oid> <remote-oid> [remote]
+set -eu
+
+tag_ref=${1:-}
+tag_oid=${2:-}
+remote_oid=${3:-}
+remote_name=${4:-origin}
+
+fail() {
+    echo "release check: $*" >&2
+    exit 1
+}
+
+is_zero_oid() {
+    case "$1" in
+        ''|*[!0]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+case "$tag_ref" in
+    refs/tags/v*) tag_name=${tag_ref#refs/tags/} ;;
+    *) fail "expected a release ref under refs/tags/v*, got '$tag_ref'" ;;
+esac
+
+# SemVer 2.0 versions. Numeric identifiers may not contain leading zeroes;
+# alphanumeric pre-release and build identifiers use SemVer's ASCII set.
+if ! printf '%s\n' "$tag_name" | grep -Eq \
+    '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+    fail "'$tag_name' is not a valid v-prefixed SemVer tag (example: v1.2.3)"
+fi
+
+[ -n "$tag_oid" ] || fail "missing local object id for $tag_name"
+
+if [ -n "$remote_oid" ] && ! is_zero_oid "$remote_oid"; then
+    fail "$tag_name already exists on the remote; release tags are immutable"
+fi
+
+object_type=$(git cat-file -t "$tag_oid" 2>/dev/null) ||
+    fail "cannot read object $tag_oid for $tag_name"
+[ "$object_type" = tag ] ||
+    fail "$tag_name must be an annotated tag (lightweight tags are not releases)"
+
+declared_name=$(git cat-file -p "$tag_oid" | sed -n 's/^tag //p' | sed -n '1p')
+[ "$declared_name" = "$tag_name" ] ||
+    fail "$tag_name does not match the annotated tag object's name '$declared_name'"
+
+release_commit=$(git cat-file -p "$tag_oid" | sed -n 's/^object //p' | sed -n '1p')
+[ -n "$release_commit" ] || fail "$tag_name has no target object"
+target_type=$(git cat-file -t "$release_commit" 2>/dev/null) ||
+    fail "cannot read the target of $tag_name"
+[ "$target_type" = commit ] || fail "$tag_name must point directly to a commit"
+
+if ! git cat-file -p "$tag_oid" | sed '1,/^$/d' | grep -q '[^[:space:]]'; then
+    fail "$tag_name needs a non-empty annotation to serve as release notes"
+fi
+
+# Prefer the remote's configured default branch, then the conventional local
+# release branches. RELEASE_BRANCH is an explicit escape hatch for projects
+# that intentionally release from another branch.
+release_branch=${RELEASE_BRANCH:-}
+if [ -z "$release_branch" ]; then
+    remote_head=$(git symbolic-ref -q "refs/remotes/$remote_name/HEAD" 2>/dev/null || true)
+    if [ -n "$remote_head" ]; then
+        release_branch=${remote_head#refs/remotes/$remote_name/}
+        if git show-ref --verify --quiet "refs/heads/$release_branch"; then
+            release_ref="refs/heads/$release_branch"
+        else
+            release_ref=$remote_head
+        fi
+    elif git show-ref --verify --quiet refs/heads/master; then
+        release_branch=master
+        release_ref=refs/heads/master
+    elif git show-ref --verify --quiet refs/heads/main; then
+        release_branch=main
+        release_ref=refs/heads/main
+    else
+        fail "cannot determine the release branch; set RELEASE_BRANCH explicitly"
+    fi
+else
+    release_ref="refs/heads/$release_branch"
+fi
+
+git rev-parse --verify "$release_ref^{commit}" >/dev/null 2>&1 ||
+    fail "release branch '$release_branch' is not available locally"
+git merge-base --is-ancestor "$release_commit" "$release_ref" ||
+    fail "$tag_name points outside release branch '$release_branch'"
+
+echo "release check: $tag_name is an annotated SemVer tag on $release_branch"

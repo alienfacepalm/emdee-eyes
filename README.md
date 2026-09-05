@@ -1,5 +1,7 @@
 # emdee-eyes
 
+[![Tests](https://github.com/alienfacepalm/emdee-eyes/actions/workflows/tests.yml/badge.svg)](https://github.com/alienfacepalm/emdee-eyes/actions/workflows/tests.yml)
+
 A markdown viewer for the terminal. `emdee-eyes` is a small wrapper around
 [glow](https://github.com/charmbracelet/glow) that adds sane terminal-width
 wrapping and one command that does the right thing for a file, a directory,
@@ -49,8 +51,8 @@ emdee-eyes examples/01-basics.md
 ```
 
 Both installers also wire up `.githooks` (`git config core.hooksPath
-.githooks`) so `git commit` and `git push` run the test suite first — see
-[Testing](#testing).
+.githooks`) so `git commit` and `git push` run the test suite first. Release
+tags receive additional checks before push — see [Releasing](#releasing).
 
 ## Project layout
 
@@ -66,17 +68,36 @@ tests/regression/ edge-case coverage, glow stubbed out (bats + Pester)
 tests/e2e/        real glow, real example files (bats + Pester)
 tests/run.sh      runs the bats suites (unit, regression, e2e) for bin/emdee-eyes
 tests/run.ps1     runs the Pester suites (unit, regression, e2e) for bin/emdee-eyes.ps1
-tests/verify.sh   runs whichever of the two this machine can — used by .githooks
-.githooks/        pre-commit and pre-push hooks that call tests/verify.sh
+tests/verify.sh   tests the hooks, then runs whichever implementation suites this machine can
+.githooks/        commit, push, and release-tag checks
 doc/              setup, onboarding, and usage documentation
 ```
 
 ## Testing
 
+For the POSIX suite, install Bats with the package manager for your platform:
+
 ```sh
-brew install bats-core                                    # for tests/run.sh
-Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force   # for tests/run.ps1
-./tests/verify.sh     # runs whichever of the two this machine has tooling for
+# macOS
+brew install bats-core
+
+# Ubuntu/Debian
+sudo apt-get update && sudo apt-get install -y bats
+
+./tests/run.sh
+```
+
+For the PowerShell suite, install Pester:
+
+```powershell
+Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force
+./tests/run.ps1
+```
+
+Or run every suite available on the current machine:
+
+```sh
+./tests/verify.sh
 ```
 
 Unit tests stub out `glow` to check `emdee-eyes`'s own argument routing
@@ -93,6 +114,32 @@ implementations are held to the same behavior.
 `.githooks/pre-commit` and `.githooks/pre-push` both run `tests/verify.sh`,
 so once you've run either installer, every commit and push is verified
 automatically.
+
+GitHub Actions runs the POSIX suite on Ubuntu and the PowerShell suite on
+Windows for pull requests, manual dispatches, and `v*` release tags. Unlike
+local verification, CI always runs both implementations and
+installs real copies of Glow and `emdee-eyes` for the end-to-end coverage.
+
+## Releasing
+
+Releases are annotated, `v`-prefixed [Semantic Versioning](https://semver.org/)
+tags made from `master`. Put useful release notes in the tag annotation:
+
+```sh
+git switch master
+git pull --ff-only
+git tag -a v1.2.3 -m 'Describe the user-visible changes in 1.2.3'
+git push origin v1.2.3
+```
+
+The pre-push hook rejects malformed or lightweight release tags, empty tag
+annotations, tags outside the release branch, and updates or deletions of an
+existing release tag. It then runs the normal verification suite. Pre-release
+and build suffixes such as `v2.0.0-rc.1` and `v2.0.0+build.7` are accepted.
+
+These are local guardrails, not access control: Git permits bypassing a
+pre-push hook with `--no-verify`, and hooks are not copied by `git clone`.
+Protect release tags on the remote as the authoritative enforcement layer.
 
 ## License
 

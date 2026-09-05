@@ -10,11 +10,17 @@ DIR=$(cd "$(dirname "$0")/.." && pwd)
 ran_any=0
 failed=0
 
+echo "== release hook tests =="
+"$DIR/tests/hooks.sh" || failed=1
+echo
+
 if command -v bats >/dev/null 2>&1; then
     ran_any=1
     "$DIR/tests/run.sh" || failed=1
 else
-    echo "verify.sh: bats not found — skipping the sh-implementation suite (install with: brew install bats-core)" >&2
+    echo "verify.sh: bats not found — skipping the sh-implementation suite" >&2
+    echo "  macOS:          brew install bats-core" >&2
+    echo "  Ubuntu/Debian:  sudo apt-get install bats" >&2
 fi
 
 pwsh_cmd=""
