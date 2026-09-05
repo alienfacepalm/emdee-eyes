@@ -81,7 +81,8 @@ refute_csi_codes() {
 @test "browsing a directory without a controlling terminal fails clearly" {
     # glow's directory browser is a full TUI and needs a real /dev/tty;
     # this documents that emdee-eyes <dir> is for interactive use only.
-    run "$EMDEE_EYES" "$EXAMPLES"
+    command -v setsid >/dev/null 2>&1 || skip "setsid is required to detach the controlling terminal"
+    run setsid "$EMDEE_EYES" "$EXAMPLES" </dev/null
     [ "$status" -ne 0 ]
     [[ "$output" == *"TTY"* ]]
 }

@@ -111,6 +111,13 @@ FAKE
     grep -qF -- "ARGS:-s auto -w 80 README.md" "$GLOW_LOG"
 }
 
+@test "an explicit file wins over inherited piped stdin" {
+    run bash -c "printf 'ignored stdin' | \"$EMDEE_EYES\" README.md"
+    [ "$status" -eq 0 ]
+    grep -qF -- "ARGS:-s auto -w $DEFAULT_WIDTH README.md" "$GLOW_LOG"
+    ! grep -qF -- "ignored stdin" "$GLOW_LOG"
+}
+
 @test "a directory argument with a trailing slash is still browsed, not rendered as a file" {
     dir="$BATS_TEST_TMPDIR/docs"
     mkdir -p "$dir"
