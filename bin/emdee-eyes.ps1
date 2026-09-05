@@ -45,7 +45,7 @@ if ($Files.Count -ge 1 -and ($Files[0] -eq '-h' -or $Files[0] -eq '--help')) {
     exit 0
 }
 
-$glowCommand = Get-Command glow -ErrorAction SilentlyContinue
+$glowCommand = Get-Command glow -CommandType Application -ErrorAction SilentlyContinue
 if (-not $glowCommand) {
     [Console]::Error.WriteLine('emdee-eyes: glow not found — install it with: winget install charmbracelet.glow')
     exit 127
