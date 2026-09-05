@@ -10,6 +10,10 @@ DIR=$(cd "$(dirname "$0")/.." && pwd)
 ran_any=0
 failed=0
 
+echo "== release hook tests =="
+"$DIR/tests/hooks.sh" || failed=1
+echo
+
 if command -v bats >/dev/null 2>&1; then
     ran_any=1
     "$DIR/tests/run.sh" || failed=1
