@@ -34,17 +34,19 @@ setup() {
 FAKE
     chmod +x "$FAKE_BIN/glow"
 
+    cat > "$FAKE_BIN/tput" <<'FAKE'
+#!/bin/sh
+[ "${1:-}" = cols ] || exit 1
+printf '80\n'
+FAKE
+    chmod +x "$FAKE_BIN/tput"
+
     PATH="$FAKE_BIN:/usr/bin:/bin"
     export PATH
 
-    default_cols=$(tput cols 2>/dev/null || echo 80)
-    DEFAULT_WIDTH=$((default_cols - 4))
-    if [ "$DEFAULT_WIDTH" -gt 100 ]; then
-        DEFAULT_WIDTH=100
-    fi
-    if [ "$DEFAULT_WIDTH" -lt 20 ]; then
-        DEFAULT_WIDTH=20
-    fi
+    COLUMNS=
+    export COLUMNS
+    DEFAULT_WIDTH=76
 }
 
 @test "a filename containing spaces is passed through as one argument, not split" {
@@ -101,6 +103,19 @@ FAKE
     COLUMNS=24 run "$EMDEE_EYES" README.md
     [ "$status" -eq 0 ]
     grep -qF -- "ARGS:-s auto -w 20 README.md" "$GLOW_LOG"
+}
+
+@test "a nonnumeric COLUMNS value falls back to 80 instead of breaking arithmetic" {
+    COLUMNS=unknown run "$EMDEE_EYES" README.md
+    [ "$status" -eq 0 ]
+    grep -qF -- "ARGS:-s auto -w 80 README.md" "$GLOW_LOG"
+}
+
+@test "an explicit file wins over inherited piped stdin" {
+    run bash -c "printf 'ignored stdin' | \"$EMDEE_EYES\" README.md"
+    [ "$status" -eq 0 ]
+    grep -qF -- "ARGS:-s auto -w $DEFAULT_WIDTH README.md" "$GLOW_LOG"
+    ! grep -qF -- "ignored stdin" "$GLOW_LOG"
 }
 
 @test "a directory argument with a trailing slash is still browsed, not rendered as a file" {

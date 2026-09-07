@@ -51,11 +51,18 @@ fi
 style="${MD_STYLE:-auto}"
 
 width=80
-if cols=$(tput cols 2>/dev/null) && [ -n "$cols" ]; then
-    width=$((cols - 4))
-    [ "$width" -gt 100 ] && width=100
-    [ "$width" -lt 20 ] && width=20
+cols=${COLUMNS:-}
+if [ -z "$cols" ]; then
+    cols=$(tput cols 2>/dev/null) || cols=""
 fi
+case "$cols" in
+    ''|*[!0-9]*) ;;
+    *)
+        width=$((cols - 4))
+        [ "$width" -gt 100 ] && width=100
+        [ "$width" -lt 20 ] && width=20
+        ;;
+esac
 
 # No args and stdin is a TTY: browse the current directory.
 if [ "$#" -eq 0 ] && [ -t 0 ]; then
@@ -64,7 +71,7 @@ fi
 
 # Single directory argument: browse that directory.
 if [ "$#" -eq 1 ] && [ -d "$1" ]; then
-    exec glow -s "$style" -w "$width" "$1"
+    exec glow -s "$style" -w "$width" "$1" </dev/null
 fi
 
 esc=$(printf '\033')
@@ -93,7 +100,7 @@ show_hints=0
 render_all() {
     if [ "$#" -eq 0 ]; then
         # No file arguments: read from stdin.
-        glow -s "$style" -w "$width"
+        glow -s "$style" -w "$width" -
         return
     fi
     for f in "$@"; do
@@ -104,7 +111,9 @@ render_all() {
         elif [ "$show_hints" -eq 1 ]; then
             printf '\n\033[1;36m── %s ──  %s\033[0m\n\n' "$f" "$hints"
         fi
-        glow -s "$style" -w "$width" "$f"
+        # Glow prioritizes piped stdin over a source argument. Disconnect it
+        # here so explicit files/URLs still win inside hooks and test runners.
+        glow -s "$style" -w "$width" "$f" </dev/null
     done
 }
 

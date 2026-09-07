@@ -77,6 +77,15 @@ Describe 'emdee-eyes.ps1 regression coverage' {
         Get-Content $script:GlowLog -Raw | Should -Match ([regex]::Escape("ARGS:-s auto -w 20 $readme"))
     }
 
+    It 'an explicit file wins over inherited piped stdin' {
+        $readme = Join-Path $PSScriptRoot '..\..\README.md'
+        $result = Invoke-Emdee -Arguments @($readme) -StdinText 'ignored stdin' -FakeBinDir $script:FakeBin -Env @{ GLOW_LOG = $script:GlowLog }
+        $result.ExitCode | Should -Be 0
+        $log = Get-Content $script:GlowLog -Raw
+        $log | Should -Match ([regex]::Escape("ARGS:-s auto -w 80 $readme"))
+        $log | Should -Not -Match 'ignored stdin'
+    }
+
     It 'a directory argument with a trailing slash is still browsed, not rendered as a file' {
         $dir = Join-Path $script:FakeBin 'docs'
         New-Item -ItemType Directory -Force -Path $dir | Out-Null

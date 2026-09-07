@@ -34,22 +34,24 @@ setup() {
 FAKE
     chmod +x "$FAKE_BIN/glow"
 
+    cat > "$FAKE_BIN/tput" <<'FAKE'
+#!/bin/sh
+# Keep the no-COLUMNS fallback deterministic regardless of the host terminal.
+[ "${1:-}" = cols ] || exit 1
+printf '80\n'
+FAKE
+    chmod +x "$FAKE_BIN/tput"
+
     # A restricted PATH containing the fake glow plus enough of the base
-    # system for emdee-eyes's own shell built-ins (tput, cat, printf) to work.
+    # system for emdee-eyes's other commands to work.
     PATH="$FAKE_BIN:/usr/bin:/bin"
     export PATH
 
-    # The default width emdee-eyes computes when no COLUMNS override is set,
-    # derived the same way the script does, so tests aren't hardcoded to
-    # one machine's `tput cols` fallback.
-    default_cols=$(tput cols 2>/dev/null || echo 80)
-    DEFAULT_WIDTH=$((default_cols - 4))
-    if [ "$DEFAULT_WIDTH" -gt 100 ]; then
-        DEFAULT_WIDTH=100
-    fi
-    if [ "$DEFAULT_WIDTH" -lt 20 ]; then
-        DEFAULT_WIDTH=20
-    fi
+    # Bats may expose a shell-local COLUMNS value that child processes do not
+    # inherit. Export an empty value so both sides take the fake tput fallback.
+    COLUMNS=
+    export COLUMNS
+    DEFAULT_WIDTH=76
 }
 
 @test "--help prints usage and exits 0, even with no glow installed" {
@@ -68,7 +70,9 @@ FAKE
 
 @test "missing glow fails fast with a clear, actionable error" {
     rm -f "$FAKE_BIN/glow"
-    run -127 "$EMDEE_EYES" README.md
+    # Keep the real machine PATH out of this assertion. CI installs Glow for
+    # the e2e suite, and finding that copy here would invalidate this test.
+    PATH="$FAKE_BIN" run -127 "$EMDEE_EYES" README.md
     [ "$status" -eq 127 ]
     [[ "$output" == *"glow not found"* ]]
     [[ "$output" == *"brew install glow"* ]]

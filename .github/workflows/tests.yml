@@ -1,0 +1,99 @@
+name: Tests
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GLOW_VERSION: 3.0.0
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  posix:
+    name: POSIX sh / Bats
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bats
+          archive="$RUNNER_TEMP/glow.tar.gz"
+          filename="glow_${GLOW_VERSION}_Linux_x86_64.tar.gz"
+          curl --fail --location --silent --show-error \
+            --output "$archive" \
+            "https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/${filename}"
+          printf '%s  %s\n' \
+            '13e05e4b2acc18d2aee44291aefe6325b077ec321b631a0cfa780e8e3bc33f78' \
+            "$archive" | sha256sum --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/glow_${GLOW_VERSION}_Linux_x86_64" >> "$GITHUB_PATH"
+
+      - name: Install emdee-eyes
+        run: ./install.sh
+
+      - name: Run release-hook tests
+        run: ./tests/hooks.sh
+
+      - name: Validate pushed release tag
+        if: github.ref_type == 'tag'
+        run: |
+          tag_oid=$(git rev-parse "$GITHUB_REF")
+          ./.githooks/check-release-tag "$GITHUB_REF" "$tag_oid" '' origin
+
+      - name: Run POSIX test suite
+        run: ./tests/run.sh
+
+  powershell:
+    name: PowerShell / Pester
+    runs-on: windows-2025
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Glow
+        shell: pwsh
+        run: |
+          $filename = "glow_$($env:GLOW_VERSION)_Windows_x86_64.zip"
+          $archive = Join-Path $env:RUNNER_TEMP $filename
+          $uri = "https://github.com/charmbracelet/glow/releases/download/v$($env:GLOW_VERSION)/$filename"
+          Invoke-WebRequest -Uri $uri -OutFile $archive
+          $expected = 'd8907e07436ecbb6738bc0e3bbf8aa6159e351f95082e9db3c3fc4200086f809'
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+              throw "Glow archive checksum mismatch: expected $expected, got $actual"
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
+          $glowBin = Join-Path $env:RUNNER_TEMP "glow_$($env:GLOW_VERSION)_Windows_x86_64"
+          $glowBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -RequiredVersion 5.9.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Install emdee-eyes
+        shell: pwsh
+        run: ./install.ps1
+
+      - name: Run PowerShell test suite
+        shell: pwsh
+        run: ./tests/run.ps1

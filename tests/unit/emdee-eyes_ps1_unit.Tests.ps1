@@ -35,7 +35,16 @@ Describe 'emdee-eyes.ps1 argument routing' {
     }
 
     It 'missing glow fails fast with a clear, actionable error' {
-        $result = Invoke-Emdee -Arguments @('README.md')
+        # CI installs Glow for the e2e suite. Remove only the test stub and use
+        # Invoke-Emdee's restricted PATH so this assertion remains isolated
+        # from the runner's real tools.
+        Remove-Item -LiteralPath (Join-Path $script:FakeBin 'glow.ps1') -Force
+        if ($IsWindows) {
+            Remove-Item -LiteralPath (Join-Path $script:FakeBin 'glow.cmd') -Force
+        } else {
+            Remove-Item -LiteralPath (Join-Path $script:FakeBin 'glow') -Force
+        }
+        $result = Invoke-Emdee -Arguments @('README.md') -FakeBinDir $script:FakeBin
         $result.ExitCode | Should -Be 127
         $result.Output | Should -Match 'glow not found'
     }

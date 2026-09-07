@@ -10,7 +10,9 @@ set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 
 if ! command -v bats >/dev/null 2>&1; then
-    echo "run.sh: bats not found — install it with: brew install bats-core" >&2
+    echo "run.sh: bats not found — install it with your package manager:" >&2
+    echo "  macOS:          brew install bats-core" >&2
+    echo "  Ubuntu/Debian:  sudo apt-get install bats" >&2
     exit 1
 fi
 

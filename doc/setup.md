@@ -44,7 +44,9 @@ Each does the same four things for its platform:
    pointing at `bin/emdee-eyes.ps1` on Windows.
 3. Warns if `~/.local/bin` isn't on your `PATH`.
 4. Sets `git config core.hooksPath .githooks`, so `git commit`/`git push`
-   run the test suite first (see [Running the test suite](#running-the-test-suite)).
+   run the test suite first and outgoing release tags are validated (see
+   [Running the test suite](#running-the-test-suite) and
+   [Releasing](../README.md#releasing)).
 
 Because the installed command is a symlink/shim back into this project,
 there is exactly one copy of each script — pulling updates to this project
@@ -121,18 +123,27 @@ The test suite is only needed if you're changing `bin/emdee-eyes` or
 matches the tooling you have (both, if you have both):
 
 ```sh
-brew install bats-core                # macOS/Linux/Git Bash/WSL
+# macOS
+brew install bats-core
+
+# Ubuntu/Debian
+sudo apt-get update && sudo apt-get install -y bats
+
 ./tests/run.sh
 ```
+
+On other Linux distributions, install the `bats` package using the system
+package manager before running `./tests/run.sh`.
 
 ```powershell
 Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force   # Windows
 ./tests/run.ps1
 ```
 
-Or run `./tests/verify.sh`, which runs both if both are available and
-otherwise whichever one is — this is exactly what `.githooks/pre-commit`
-and `.githooks/pre-push` run automatically once you've run an installer.
+Or run `./tests/verify.sh`, which first tests the release hook and then runs
+both implementation suites if both are available (otherwise whichever one
+is). This is exactly what `.githooks/pre-commit` and `.githooks/pre-push` run
+automatically once you've run an installer.
 
 Each suite runs, in order: `tests/unit` (argument-routing logic, stubbed
 glow — no dependency on rendering), `tests/regression` (the same stub,
@@ -140,3 +151,9 @@ covering specific edge cases like filenames with spaces and width-clamp
 boundaries), and `tests/e2e` (the real glow, against the files in
 `examples/`). See [usage.md](usage.md) for what each example file
 demonstrates.
+
+The repository's GitHub Actions workflow runs both suites for every pull
+request and `v*` release tag, and it can also be started manually. The Linux
+job installs the POSIX command and the Windows job installs the PowerShell
+command, so the installed-command end-to-end checks run in CI instead of
+being skipped.
